@@ -60,6 +60,7 @@ def material_count(board):
     bishop, knight = 3.33, 3.05
     rook = 5.63
     queen = 9.5
+    king = 14
     white = 0
     black = 0
 
@@ -69,6 +70,17 @@ def material_count(board):
             pass
         else:
             piece = piece.symbol()
+        if piece == "K":
+            if "q" in board.board_fen() or "Q" in board.board_fen():
+                square_piece = square_sets_w("king_s")
+                mod = square_piece[square]
+                add = king + mod
+                white += add
+            else:
+                square_piece = square_sets_w("king_e")
+                mod = square_piece[square]
+                add = king + mod
+                white += add
         if piece == "P":
             square_piece = square_sets_w("pawn")
             mod = square_piece[square]
@@ -94,6 +106,18 @@ def material_count(board):
             mod = square_piece[square]
             add = queen + mod
             white += add
+
+        if piece == "k":
+            if "q" in board.board_fen() or "Q" in board.board_fen():
+                square_piece = square_sets_b("king_s")
+                mod = square_piece[square]
+                add = king + mod
+                black += add
+            else:
+                square_piece = square_sets_b("king_e")
+                mod = square_piece[square]
+                add = king + mod
+                black += add
         if piece == "p":
             square_piece = square_sets_b("pawn")
             mod = square_piece[square]
@@ -144,6 +168,28 @@ def order_moves(input_board):
             capture_type = mini.piece_at(destination)
 
             if capture_type is not None:
+
+                if mini.turn:
+                    turn = chess.BLACK
+                else:
+                    turn = chess.WHITE
+
+                if mini.is_attacked_by(turn, destination):
+                    if input_board.is_checkmate():
+                        return 99999
+                    attackers = mini.attackers(turn, destination).tolist()
+                    for index, result in enumerate(attackers):
+                        if result:
+                            if mini.piece_at(index).symbol().lower() == "p":
+                                score_guess -= piece_val(mini.piece_at(origin).symbol()) * multiplier
+                            elif mini.piece_at(origin).symbol().lower() == "q":
+                                if mini.piece_at(index).symbol().lower() != "q":
+                                    score_guess -= piece_val(mini.piece_at(index).symbol()) * multiplier
+                            else:
+                                return 0
+                        else:
+                            return 1
+                    return score_guess
                 capture_type = capture_type.symbol()
                 capture_val = piece_val(capture_type)
                 move_val = piece_val(move_type.symbol())
@@ -164,14 +210,14 @@ def order_moves(input_board):
                     if result:
                         if mini.piece_at(index).symbol().lower() == "p":
                             score_guess -= piece_val(mini.piece_at(origin).symbol()) * multiplier
-                            return score_guess
-                        elif mini.piece_at(origin).symbol() == "q":
+                        elif mini.piece_at(origin).symbol().lower() == "q":
                             if mini.piece_at(index).symbol().lower() != "q":
                                 score_guess -= piece_val(mini.piece_at(index).symbol()) * multiplier
                         else:
                             return 0
                     else:
                         return 1
+                return score_guess
             if mini.gives_check(move_o):
                 if input_board.is_checkmate():
                     return 99999
@@ -181,15 +227,14 @@ def order_moves(input_board):
                         if result:
                             if mini.piece_at(index).symbol().lower() != "k":
                                 score_guess -= piece_val(mini.piece_at(origin).symbol()) * math.ceil(multiplier / 2)
-                                return score_guess
                             else:
                                 if not input_board.is_fivefold_repetition() or not input_board.is_stalemate() or not input_board.is_fifty_moves() or not input_board.is_insufficient_material():
-                                    return 10 * piece_val("k") - math.ceil(
-                                        piece_val(mini.piece_at(origin).symbol()) / 2)
+                                    score_guess -= 10 * piece_val("k") - math.ceil(piece_val(mini.piece_at(origin).symbol()) / 2)
                                 else:
                                     return -999
                         else:
                             return 0
+                    return score_guess
                 else:
                     if not input_board.is_fivefold_repetition() or not input_board.is_stalemate() or not input_board.is_fifty_moves() or not input_board.is_insufficient_material():
                         return 10 * piece_val("k") - math.ceil(piece_val(mini.piece_at(origin).symbol()) / 2)
@@ -211,15 +256,20 @@ def order_moves(input_board):
                 attackers = mini.attackers(turn, destination).tolist()
                 for index, result in enumerate(attackers):
                     if result:
-                        score_guess -= piece_val(mini.piece_at(origin).symbol()) * math.ceil(multiplier / 2)
-                        return score_guess
-                    else:
-                        score_guess += piece_val(piece_symbol) * math.ceil(multiplier / 2)
-                        return
-            else:
-                score_guess += piece_val(piece_symbol)
+                        score_guess -= piece_val(piece_symbol) * math.ceil(multiplier / 2)
                 return score_guess
-
+            else:
+                if mini.piece_at(destination) is not None:
+                    if mini.is_attacked_by(turn, destination):
+                        if input_board.is_checkmate():
+                            return 99999
+                        attackers = mini.attackers(turn, destination).tolist()
+                        for index, result in enumerate(attackers):
+                            if result:
+                                score_guess -= piece_val(piece_symbol) * math.ceil(multiplier / 2)
+                        return score_guess
+                    return piece_val(piece_symbol) + piece_val(mini.piece_at(destination).symbol())
+                return piece_val(piece_symbol)
 
 def search(search_board, depth, alpha, beta):
     if depth == 0:
@@ -231,17 +281,18 @@ def search(search_board, depth, alpha, beta):
     if search_board.is_game_over():
         if search_board.is_checkmate():
             return 99999
-        return 0
+        return 999
     if len(moves) == 0:
         if search_board.is_game_over():
             if search_board.is_checkmate():
                 return 99999
+            return 999
         return 0
 
     move_order = {}
     for move in moves:
         search_board.push(move)
-        move_eval = order_moves(search_board)
+        move_eval = round(order_moves(search_board), 3)
         if move_eval in move_order:
             move_order[move_eval].append(move)
         else:
@@ -323,6 +374,7 @@ def make_move(board):
         evals = move_order.keys()
         move_eval = max(evals)
         moves_search = move_order[move_eval]
+        random.shuffle(moves_search)
         best_moves = {}
         for move in moves_search:
             think_board_two.push(move)
@@ -350,6 +402,7 @@ def make_move(board):
 
 
 def play_game(board):
+    force_game_over = False
     opening_book = select_book()
 
     start = time.time()
@@ -365,7 +418,6 @@ def play_game(board):
         while not board.is_game_over():
             if board.turn:
                 move = make_move(board)
-                print(board)
                 node = node.add_variation(move[1])
                 node.comment = f"Move: {move[0]}"
             else:
@@ -377,7 +429,6 @@ def play_game(board):
         while not board.is_game_over():
             if not board.turn:
                 move = make_move(board)
-                print(board)
                 node = node.add_variation(move[1])
                 node.comment = f"Move: {move[0]}"
             else:
@@ -386,10 +437,12 @@ def play_game(board):
                 board.push(player_push)
                 node = node.add_variation(chess.Move.from_uci(move))
     if play == "both":
-        while not board.is_game_over():
+        while not board.is_game_over() and force_game_over == False:
             move = make_move(board)
             node = node.add_variation(move[1])
             node.comment = f"Move: {move[0]}"
+            if board.fullmove_number == 200:
+                force_game_over = True
 
     outcome = board.outcome()
     if outcome is None:

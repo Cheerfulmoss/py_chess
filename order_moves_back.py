@@ -1,23 +1,46 @@
+from chess_bot.Black_square_sets import square_sets_b
+from chess_bot.White_square_sets import square_sets_w
 
-def piece_val(piece_symbol):
+
+def piece_val(piece_symbol, destination, turn):
     piece_symbol = piece_symbol.lower()
 
     pawn = 1
     bishop, knight = 3.33, 3.05
     rook = 5.63
     queen = 9.5
-    king = 9
+    king = 14
 
     if piece_symbol == "p":
-        return pawn
+        if turn is True:
+            pawn_mod = square_sets_w("pawn")[destination]
+        else:
+            pawn_mod = square_sets_b("pawn")[destination]
+        return pawn + pawn_mod
     if piece_symbol == "b":
-        return bishop
+        if turn is True:
+            bishop_mod = square_sets_w("bishop")[destination]
+        else:
+            bishop_mod = square_sets_b("bishop")[destination]
+        return bishop + bishop_mod
     if piece_symbol == "n":
-        return knight
+        if turn is True:
+            knight_mod = square_sets_w("knight")[destination]
+        else:
+            knight_mod = square_sets_b("knight")[destination]
+        return knight + knight_mod
     if piece_symbol == "r":
-        return rook
+        if turn is True:
+            rook_mod = square_sets_w("rook")[destination]
+        else:
+            rook_mod = square_sets_b("rook")[destination]
+        return rook + rook_mod
     if piece_symbol == "q":
-        return queen
+        if turn is True:
+            queen_mod = square_sets_w("queen")[destination]
+        else:
+            queen_mod = square_sets_b("queen")[destination]
+        return queen + queen_mod
     if piece_symbol == "k":
         return king
 

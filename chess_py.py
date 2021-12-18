@@ -12,6 +12,9 @@ from chess_bot.Black_square_sets import square_sets_b
 from chess_bot.order_moves_back import piece_val, uci_to_index
 
 
+import pdb
+
+
 def generate_moves(legal_board):
     legal_moves_list = []
     legal_moves = legal_board.legal_moves
@@ -181,18 +184,17 @@ def order_moves(input_board):
                     for index, result in enumerate(attackers):
                         if result:
                             if mini.piece_at(index).symbol().lower() == "p":
-                                score_guess -= piece_val(mini.piece_at(origin).symbol()) * multiplier
+                                score_guess -= piece_val(mini.piece_at(origin).symbol(), destination, mini.turn) * multiplier
                             elif mini.piece_at(origin).symbol().lower() == "q":
                                 if mini.piece_at(index).symbol().lower() != "q":
-                                    score_guess -= piece_val(mini.piece_at(index).symbol()) * multiplier
+                                    score_guess -= piece_val(mini.piece_at(index).symbol(), destination, mini.turn) * multiplier
                             else:
-                                return 0
-                        else:
-                            return 1
+                                score_guess -= piece_val(mini.piece_at(index).symbol(), destination, mini.turn) * multiplier
+                                return score_guess
                     return score_guess
                 capture_type = capture_type.symbol()
-                capture_val = piece_val(capture_type)
-                move_val = piece_val(move_type.symbol())
+                capture_val = piece_val(capture_type, destination, input_board.turn)
+                move_val = piece_val(move_type.symbol(), origin, mini.turn)
                 score_guess = 10 * capture_val - move_val
                 return score_guess
 
@@ -209,14 +211,12 @@ def order_moves(input_board):
                 for index, result in enumerate(attackers):
                     if result:
                         if mini.piece_at(index).symbol().lower() == "p":
-                            score_guess -= piece_val(mini.piece_at(origin).symbol()) * multiplier
+                            score_guess -= piece_val(mini.piece_at(origin).symbol(), destination, mini.turn) * multiplier
                         elif mini.piece_at(origin).symbol().lower() == "q":
                             if mini.piece_at(index).symbol().lower() != "q":
-                                score_guess -= piece_val(mini.piece_at(index).symbol()) * multiplier
+                                score_guess -= piece_val(mini.piece_at(index).symbol(), destination, mini.turn) * multiplier
                         else:
-                            return 0
-                    else:
-                        return 1
+                            score_guess -= piece_val(mini.piece_at(index).symbol(), destination, mini.turn) * multiplier
                 return score_guess
             if mini.gives_check(move_o):
                 if input_board.is_checkmate():
@@ -226,23 +226,20 @@ def order_moves(input_board):
                     for index, result in enumerate(attackers):
                         if result:
                             if mini.piece_at(index).symbol().lower() != "k":
-                                score_guess -= piece_val(mini.piece_at(origin).symbol()) * math.ceil(multiplier / 2)
+                                score_guess -= piece_val(mini.piece_at(origin).symbol(), destination, mini.turn) * math.ceil(multiplier / 2)
                             else:
                                 if not input_board.is_fivefold_repetition() or not input_board.is_stalemate() or not input_board.is_fifty_moves() or not input_board.is_insufficient_material():
-                                    score_guess -= 10 * piece_val("k") - math.ceil(piece_val(mini.piece_at(origin).symbol()) / 2)
+                                    score_guess -= 10 * piece_val("k", destination, mini.turn) - math.ceil(piece_val(mini.piece_at(origin).symbol(), destination, mini.turn) / 2)
                                 else:
                                     return -999
-                        else:
-                            return 0
                     return score_guess
                 else:
                     if not input_board.is_fivefold_repetition() or not input_board.is_stalemate() or not input_board.is_fifty_moves() or not input_board.is_insufficient_material():
-                        return 10 * piece_val("k") - math.ceil(piece_val(mini.piece_at(origin).symbol()) / 2)
+                        return 10 * piece_val("k", destination, mini.turn) - math.ceil(piece_val(mini.piece_at(origin).symbol(), destination, mini.turn) / 2)
                     else:
                         return -999
             else:
                 return 0
-
         else:
             if mini.turn:
                 turn = chess.BLACK
@@ -256,7 +253,7 @@ def order_moves(input_board):
                 attackers = mini.attackers(turn, destination).tolist()
                 for index, result in enumerate(attackers):
                     if result:
-                        score_guess -= piece_val(piece_symbol) * math.ceil(multiplier / 2)
+                        score_guess -= piece_val(piece_symbol, destination, mini.turn) * math.ceil(multiplier / 2)
                 return score_guess
             else:
                 if mini.piece_at(destination) is not None:
@@ -266,10 +263,10 @@ def order_moves(input_board):
                         attackers = mini.attackers(turn, destination).tolist()
                         for index, result in enumerate(attackers):
                             if result:
-                                score_guess -= piece_val(piece_symbol) * math.ceil(multiplier / 2)
+                                score_guess -= piece_val(piece_symbol, destination, mini.turn) * math.ceil(multiplier / 2)
                         return score_guess
-                    return piece_val(piece_symbol) + piece_val(mini.piece_at(destination).symbol())
-                return piece_val(piece_symbol)
+                    return piece_val(piece_symbol, destination, mini.turn) + piece_val(mini.piece_at(destination).symbol(), destination, input_board.turn)
+                return piece_val(piece_symbol, destination, mini.turn)
 
 def search(search_board, depth, alpha, beta):
     if depth == 0:
@@ -370,7 +367,6 @@ def make_move(board):
             else:
                 move_order[move_eval] = [move]
             think_board.pop()
-
         evals = move_order.keys()
         move_eval = max(evals)
         moves_search = move_order[move_eval]

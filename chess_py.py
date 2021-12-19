@@ -58,11 +58,12 @@ def evaluate(board):
 
 
 def material_count(board):
+    value = 10
     pawn = 1
     bishop, knight = 3.33, 3.05
     rook = 5.63
     queen = 9.5
-    king = 14
+    king = 0
     white = 0
     black = 0
 
@@ -75,207 +76,207 @@ def material_count(board):
         if piece == "K":
             if "q" in board.board_fen() or "Q" in board.board_fen():
                 square_piece = square_sets_w("king_s")
-                mod = square_piece[square]
+                mod = square_piece[square] / value
                 add = king + mod
                 white += add
             else:
                 square_piece = square_sets_w("king_e")
-                mod = square_piece[square]
+                mod = square_piece[square] / value
                 add = king + mod
                 white += add
         if piece == "P":
             square_piece = square_sets_w("pawn")
-            mod = square_piece[square]
+            mod = square_piece[square] / value
             add = pawn + mod
             white += add
         if piece == "B":
             square_piece = square_sets_w("bishop")
-            mod = square_piece[square]
+            mod = square_piece[square] / value
             add = bishop + mod
             white += add
         if piece == "N":
             square_piece = square_sets_w("knight")
-            mod = square_piece[square]
+            mod = square_piece[square] / value
             add = knight + mod
             white += add
         if piece == "R":
             square_piece = square_sets_w("rook")
-            mod = square_piece[square]
+            mod = square_piece[square] / value
             add = rook + mod
             white += add
         if piece == "Q":
             square_piece = square_sets_w("queen")
-            mod = square_piece[square]
+            mod = square_piece[square] / value
             add = queen + mod
             white += add
 
         if piece == "k":
             if "q" in board.board_fen() or "Q" in board.board_fen():
                 square_piece = square_sets_b("king_s")
-                mod = square_piece[square]
+                mod = square_piece[square] / value
                 add = king + mod
                 black += add
             else:
                 square_piece = square_sets_b("king_e")
-                mod = square_piece[square]
+                mod = square_piece[square] / value
                 add = king + mod
                 black += add
         if piece == "p":
             square_piece = square_sets_b("pawn")
-            mod = square_piece[square]
+            mod = square_piece[square] / value
             add = pawn + mod
             black += add
         if piece == "b":
             square_piece = square_sets_b("bishop")
-            mod = square_piece[square]
+            mod = square_piece[square] / value
             add = bishop + mod
             black += add
         if piece == "n":
             square_piece = square_sets_b("knight")
-            mod = square_piece[square]
+            mod = square_piece[square] / value
             add = knight + mod
             black += add
         if piece == "r":
             square_piece = square_sets_b("rook")
-            mod = square_piece[square]
+            mod = square_piece[square] / value
             add = rook + mod
             black += add
         if piece == "q":
             square_piece = square_sets_b("queen")
-            mod = square_piece[square]
+            mod = square_piece[square] / value
             add = queen + mod
             black += add
         square += 1
     return black, white
 
 
-def order_moves(input_board):
-    multiplier = 10
+def order_moves(input_board, moves):
+    move_dict = {}
 
-    mini = input_board.copy()
-    move_o = input_board.peek()
-    mini.pop()
+    turn_board = input_board.copy()
+    test_board = input_board.copy()
+    turn_board.pop()
 
-    if move_o is None:
-        return -1
+    opposite_turn = turn_board.turn
+    current_turn = input_board.turn
 
-    else:
+    for move in moves:
         score_guess = 0
+        move_str = move.uci()
+        if len(move_str) == 4:
+            origin, destination = uci_to_index(move_str)
+            move_piece = turn_board.piece_at(origin)
+            capture_piece = input_board.piece_at(destination)
 
-        move = move_o.uci()
-        if len(move) == 4:
-            origin, destination = uci_to_index(move)
-
-            move_type = mini.piece_at(origin)
-            capture_type = mini.piece_at(destination)
-
-            if capture_type is not None:
-
-                if mini.turn:
-                    turn = chess.BLACK
+            test_board.push(move)
+            if test_board.is_stalemate() or test_board.is_insufficient_material() or \
+                    test_board.is_seventyfive_moves() or test_board.is_fifty_moves() or \
+                    test_board.is_fivefold_repetition() or test_board.is_repetition():
+                score_guess = -999
+                if score_guess in move_dict:
+                    move_dict[score_guess].append(move)
                 else:
-                    turn = chess.WHITE
+                    move_dict[score_guess] = [move]
+            if test_board.is_checkmate():
+                score_guess = 99999
+                if score_guess in move_dict:
+                    move_dict[score_guess].append(move)
+                else:
+                    move_dict[score_guess] = [move]
+            test_board.pop()
 
-                if mini.is_attacked_by(turn, destination):
-                    if input_board.is_checkmate():
-                        return 99999
-                    attackers = mini.attackers(turn, destination).tolist()
+            if input_board.gives_check(move):
+                defender_count = -1
+                attacker_count = 0
+                if input_board.is_attacked_by(opposite_turn, destination):
+                    attackers = input_board.attackers(opposite_turn, destination).tolist()
+                    defenders = input_board.attackers(current_turn, destination).tolist()
+                    for piece in defenders:
+                        defender_count += 1
+                    for piece in attackers:
+                        attacker_count += 1
+
                     for index, result in enumerate(attackers):
                         if result:
-                            if mini.piece_at(index).symbol().lower() == "p":
-                                score_guess -= piece_val(mini.piece_at(origin).symbol(), destination,
-                                                         mini.turn) * multiplier
-                            elif mini.piece_at(origin).symbol().lower() == "q":
-                                if mini.piece_at(index).symbol().lower() != "q":
-                                    score_guess -= piece_val(mini.piece_at(index).symbol(), destination,
-                                                             mini.turn) * multiplier
+                            piece = input_board.piece_at(index).symbol().lower()
+                            if (piece == "k" or piece != "k") and defender_count > attacker_count:
+                                score_guess = round(10 * piece_val(move_piece.symbol(), destination, current_turn), 3)
+                            if (piece == "k" or piece != "k") and defender_count < attacker_count:
+                                score_guess = round(piece_val(move_piece.symbol(), destination, current_turn), 3)
+                            if score_guess in move_dict:
+                                move_dict[score_guess].append(move)
                             else:
-                                score_guess -= piece_val(mini.piece_at(index).symbol(), destination,
-                                                         mini.turn) * multiplier
-                                return score_guess
-                    return score_guess
-                capture_type = capture_type.symbol()
-                capture_val = piece_val(capture_type, destination, input_board.turn)
-                move_val = piece_val(move_type.symbol(), origin, mini.turn)
-                score_guess = 10 * capture_val - move_val
-                return score_guess
+                                move_dict[score_guess] = [move]
+            elif capture_piece is not None:
+                defender_count = -1
+                attacker_count = 0
+                attackers = input_board.attackers(opposite_turn, destination).tolist()
+                defenders = input_board.attackers(current_turn, destination).tolist()
+                for piece in defenders:
+                    defender_count += 1
+                for piece in attackers:
+                    attacker_count += 1
 
-            if mini.turn:
-                turn = chess.BLACK
-            else:
-                turn = chess.WHITE
+                if piece_val(move_piece.symbol(), destination, current_turn) < piece_val(capture_piece.symbol(),
+                                                                                         destination, opposite_turn):
+                    score_guess = piece_val(capture_piece.symbol(), destination, opposite_turn)
+                if defender_count > attacker_count:
+                    score_guess += round(10 * piece_val(capture_piece.symbol(), destination, opposite_turn) - \
+                                         piece_val(move_piece.symbol(), destination, current_turn), 3)
+                if attacker_count > defender_count:
+                    score_guess -= round(10 * piece_val(capture_piece.symbol(), destination, opposite_turn) + \
+                                         piece_val(move_piece.symbol(), destination, current_turn), 3)
+                if score_guess in move_dict:
+                    move_dict[score_guess].append(move)
+                else:
+                    move_dict[score_guess] = [move]
 
-            if mini.is_attacked_by(turn, destination):
-                if input_board.is_checkmate():
-                    return 99999
-                attackers = mini.attackers(turn, destination).tolist()
-
+            elif input_board.is_attacked_by(opposite_turn, destination):
+                attackers = input_board.attackers(opposite_turn, destination).tolist()
                 for index, result in enumerate(attackers):
                     if result:
-                        if mini.piece_at(index).symbol().lower() == "p":
-                            score_guess -= piece_val(mini.piece_at(origin).symbol(), destination,
-                                                     mini.turn) * multiplier
-                        elif mini.piece_at(origin).symbol().lower() == "q":
-                            if mini.piece_at(index).symbol().lower() != "q":
-                                score_guess -= piece_val(mini.piece_at(index).symbol(), destination,
-                                                         mini.turn) * multiplier
-                        else:
-                            score_guess -= piece_val(mini.piece_at(index).symbol(), destination, mini.turn) * multiplier
-                return score_guess
-            if mini.gives_check(move_o):
-                if input_board.is_checkmate():
-                    return 99999
-                elif mini.is_attacked_by(turn, destination):
-                    attackers = mini.attackers(turn, destination).tolist()
-                    for index, result in enumerate(attackers):
-                        if result:
-                            if mini.piece_at(index).symbol().lower() != "k":
-                                score_guess -= piece_val(mini.piece_at(origin).symbol(), destination,
-                                                         mini.turn) * math.ceil(multiplier / 2)
-                            else:
-                                if not input_board.is_fivefold_repetition() or not input_board.is_stalemate() or not input_board.is_fifty_moves() or not input_board.is_insufficient_material():
-                                    score_guess -= 10 * piece_val("k", destination, mini.turn) - math.ceil(
-                                        piece_val(mini.piece_at(origin).symbol(), destination, mini.turn) / 2)
-                                else:
-                                    return -999
-                    return score_guess
-                else:
-                    if not input_board.is_fivefold_repetition() or not input_board.is_stalemate() or not input_board.is_fifty_moves() or not input_board.is_insufficient_material():
-                        return 10 * piece_val("k", destination, mini.turn) - math.ceil(
-                            piece_val(mini.piece_at(origin).symbol(), destination, mini.turn) / 2)
-                    else:
-                        return -999
+                        piece = input_board.piece_at(index).symbol().lower()
+                        if piece == "p":
+                            score_guess -= round(piece_val(move_piece.symbol(), destination, current_turn) + piece_val(
+                                input_board.piece_at(index).symbol(), index, opposite_turn), 3)
+
             else:
-                return 0
+                score_guess += round(piece_val(move_piece.symbol(), destination, current_turn), 3)
+            if score_guess in move_dict:
+                move_dict[score_guess].append(move)
+            else:
+                move_dict[score_guess] = [move]
         else:
-            if mini.turn:
-                turn = chess.BLACK
-            else:
-                turn = chess.WHITE
+            origin, destination, promotion = uci_to_index(move_str)
+            move_piece = turn_board.piece_at(origin)
+            capture_piece = input_board.piece_at(destination)
 
-            origin, destination, piece_symbol = uci_to_index(move)
-            if mini.is_attacked_by(turn, destination):
-                if input_board.is_checkmate():
-                    return 99999
-                attackers = mini.attackers(turn, destination).tolist()
+            if input_board.is_attacked_by(opposite_turn, destination):
+                attackers = input_board.attackers(opposite_turn, destination).tolist()
                 for index, result in enumerate(attackers):
                     if result:
-                        score_guess -= piece_val(piece_symbol, destination, mini.turn) * math.ceil(multiplier / 2)
-                return score_guess
+                        piece = input_board.piece_at(index).symbol().lower()
+                        score_guess -= round(piece_val(move_piece.symbol(), destination, current_turn) +
+                                             piece_val(promotion, destination, current_turn) +
+                                             piece_val(piece, destination, opposite_turn), 3)
+            elif input_board.attackers(origin):
+                for square in input_board.attackers(origin):
+                    piece = input_board.piece_at(square).symbol().lower()
+                    score_guess = round(piece_val(move_piece.symbol(), destination, current_turn) +
+                                        piece_val(promotion, destination, current_turn) +
+                                        piece_val(piece, destination, opposite_turn), 3)
+                    if score_guess in move_dict:
+                        move_dict[score_guess].append(move)
+                    else:
+                        move_dict[score_guess] = [move]
             else:
-                if mini.piece_at(destination) is not None:
-                    if mini.is_attacked_by(turn, destination):
-                        if input_board.is_checkmate():
-                            return 99999
-                        attackers = mini.attackers(turn, destination).tolist()
-                        for index, result in enumerate(attackers):
-                            if result:
-                                score_guess -= piece_val(piece_symbol, destination, mini.turn) * math.ceil(
-                                    multiplier / 2)
-                        return score_guess
-                    return piece_val(piece_symbol, destination, mini.turn) + piece_val(
-                        mini.piece_at(destination).symbol(), destination, input_board.turn)
-                return piece_val(piece_symbol, destination, mini.turn)
+                score_guess = round(10 * piece_val(promotion, destination, current_turn), 3)
+            if score_guess in move_dict:
+                move_dict[score_guess].append(move)
+            else:
+                move_dict[score_guess] = [move]
+
+    return move_dict
 
 
 def search(search_board, depth, alpha, beta):
@@ -283,43 +284,26 @@ def search(search_board, depth, alpha, beta):
         eval = evaluate(search_board)
         return eval
 
-    moves = generate_moves(search_board)
-    random.shuffle(moves)
-    if search_board.is_game_over():
-        if search_board.is_checkmate():
-            return 99999
-        return 999
+    moves = order_moves(search_board, generate_moves(search_board))
     if len(moves) == 0:
-        if search_board.is_game_over():
-            if search_board.is_checkmate():
-                return 99999
-            return 999
+        if search_board.is_checkmate():
+            return -99999
         return 0
 
-    move_order = {}
-    for move in moves:
-        search_board.push(move)
-        move_eval = round(order_moves(search_board), 3)
-        if move_eval in move_order:
-            move_order[move_eval].append(move)
-        else:
-            move_order[move_eval] = [move]
-        search_board.pop()
-
-    evals = move_order.keys()
+    evals = moves.keys()
     move_eval = max(evals)
-    moves_search = move_order[move_eval]
+    moves_search = moves[move_eval]
+    random.shuffle(moves_search)
 
     for move in moves_search:
         search_board.push(move)
-        eval = -1 * round(search(search_board, depth - 1, -beta, -alpha), 3)
+        evaluation = -1 * search(search_board, depth - 1, -beta, -alpha)
         search_board.pop()
-        if type(eval) == tuple and len(eval) == 0:
-            eval = -100
-        if eval >= beta:
-            return beta
-        alpha = max(alpha, eval)
 
+        if evaluation >= beta:
+            return beta
+
+        alpha = max(alpha, evaluation)
     return alpha
 
 
@@ -355,28 +339,19 @@ def make_move(board):
         think_board_two = board.copy()
 
         while book_moves(board) is not None:
-            ran = book_moves(board)[1]
-            board.push(ran)
-            mini = board.copy()
-            move = order_moves(mini)
+            ran = book_moves(board)
+            move = ran[1]
+            eval = ran[0]
+            board.push(move)
 
             if turn:
-                print(f"White: {move, ran}")
+                print(f"White: {eval, move}")
             else:
-                print(f"Black: {move, ran}")
-            return move, ran
+                print(f"Black: {eval, move}")
+            return eval, move
 
         moves = generate_moves(board)
-        random.shuffle(moves)
-        move_order = {}
-        for move in moves:
-            think_board.push(move)
-            move_eval = order_moves(think_board)
-            if move_eval in move_order:
-                move_order[move_eval].append(move)
-            else:
-                move_order[move_eval] = [move]
-            think_board.pop()
+        move_order = order_moves(think_board, moves)
 
         evals = move_order.keys()
         move_eval = max(evals)

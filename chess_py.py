@@ -207,7 +207,7 @@ def order_moves(input_board, moves):
                                 move_dict[score_guess].append(move)
                             else:
                                 move_dict[score_guess] = [move]
-            elif capture_piece is not None:
+            if capture_piece is not None:
                 defender_count = -1
                 attacker_count = 0
                 attackers = input_board.attackers(opposite_turn, destination).tolist()
@@ -217,21 +217,25 @@ def order_moves(input_board, moves):
                 for piece in attackers:
                     attacker_count += 1
 
-                if piece_val(move_piece.symbol(), destination, current_turn) < piece_val(capture_piece.symbol(),
-                                                                                         destination, opposite_turn):
-                    score_guess = piece_val(capture_piece.symbol(), destination, opposite_turn)
+                if piece_val(capture_piece.symbol(), destination, opposite_turn) > piece_val(move_piece.symbol(),
+                                                                                             destination, current_turn):
+                    score_guess = round(piece_val(capture_piece.symbol(), destination, opposite_turn) * abs(
+                        abs(defender_count) - abs(attacker_count)), 3)
                 if defender_count > attacker_count:
                     score_guess += round(10 * piece_val(capture_piece.symbol(), destination, opposite_turn) - \
                                          piece_val(move_piece.symbol(), destination, current_turn), 3)
                 if attacker_count > defender_count:
                     score_guess -= round(10 * piece_val(capture_piece.symbol(), destination, opposite_turn) + \
                                          piece_val(move_piece.symbol(), destination, current_turn), 3)
+                if attacker_count == defender_count:
+                    score_guess += round(10 * piece_val(capture_piece.symbol(), destination, opposite_turn) - \
+                                         piece_val(move_piece.symbol(), destination, current_turn), 3)
                 if score_guess in move_dict:
                     move_dict[score_guess].append(move)
                 else:
                     move_dict[score_guess] = [move]
 
-            elif input_board.is_attacked_by(opposite_turn, destination):
+            if input_board.is_attacked_by(opposite_turn, destination):
                 attackers = input_board.attackers(opposite_turn, destination).tolist()
                 for index, result in enumerate(attackers):
                     if result:
@@ -259,7 +263,7 @@ def order_moves(input_board, moves):
                         score_guess -= round(piece_val(move_piece.symbol(), destination, current_turn) +
                                              piece_val(promotion, destination, current_turn) +
                                              piece_val(piece, destination, opposite_turn), 3)
-            elif input_board.attackers(origin):
+            if input_board.attackers(origin):
                 for square in input_board.attackers(origin):
                     piece = input_board.piece_at(square).symbol().lower()
                     score_guess = round(piece_val(move_piece.symbol(), destination, current_turn) +
@@ -384,6 +388,7 @@ def make_move(board):
 
 
 def play_game(board):
+    board = chess.Board()
     force_game_over = False
     opening_book = select_book()
 
@@ -392,11 +397,11 @@ def play_game(board):
 
     game.headers["White"] = "Random Player 1"
     game.headers["Black"] = "Random Player 2"
-    game.setup(board)
-    node = game
 
     play = input("How to play: ").lower()
     if play == "white":
+        game.setup(board)
+        node = game
         while not board.is_game_over():
             if board.turn:
                 move = make_move(board)
@@ -408,6 +413,8 @@ def play_game(board):
                 board.push(player_push)
                 node = node.add_variation(chess.Move.from_uci(move))
     if play == "black":
+        game.setup(board)
+        node = game
         while not board.is_game_over():
             if not board.turn:
                 move = make_move(board)
@@ -419,6 +426,21 @@ def play_game(board):
                 board.push(player_push)
                 node = node.add_variation(chess.Move.from_uci(move))
     if play == "both":
+        game.setup(board)
+        node = game
+        while not board.is_game_over() and force_game_over == False:
+            move = make_move(board)
+            node = node.add_variation(move[1])
+            node.comment = f"Move: {move[0]}"
+            if board.fullmove_number == 200:
+                force_game_over = True
+    if play == "test":
+        fen = input(": ")
+        previous = chess.Move.from_uci(input(": "))
+        board.set_fen(fen)
+        board.push(previous)
+        game.setup(board)
+        node = game
         while not board.is_game_over() and force_game_over == False:
             move = make_move(board)
             node = node.add_variation(move[1])

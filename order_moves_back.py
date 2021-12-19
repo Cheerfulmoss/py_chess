@@ -9,7 +9,7 @@ def piece_val(piece_symbol, destination, turn):
     bishop, knight = 3.33, 3.05
     rook = 5.63
     queen = 9.5
-    king = 14
+    king = 0
 
     if piece_symbol == "p":
         if turn is True:

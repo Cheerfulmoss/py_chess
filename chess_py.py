@@ -49,12 +49,12 @@ def evaluate(board):
     turn = board.turn
 
     black, white = material_count(board)
-    eval = white - black
+    evaluation = white - black
 
-    if not turn and eval != 0:
-        eval *= -1
+    if not turn and evaluation != 0:
+        evaluation *= -1
 
-    return eval
+    return evaluation
 
 
 def material_count(board):
@@ -150,7 +150,7 @@ def material_count(board):
     return black, white
 
 
-def order_moves(input_board, moves):
+def order_moves(input_board, moves, return_max=False, branches=1):
     move_dict = {}
 
     turn_board = input_board.copy()
@@ -185,6 +185,15 @@ def order_moves(input_board, moves):
                     move_dict[score_guess] = [move]
             test_board.pop()
 
+            if input_board.is_attacked_by(opposite_turn, destination):
+                attackers = input_board.attackers(opposite_turn, destination).tolist()
+                for index, result in enumerate(attackers):
+                    if result:
+                        piece = input_board.piece_at(index).symbol().lower()
+                        if piece == "p":
+                            score_guess -= piece_val(move_piece.symbol(), destination, current_turn) + piece_val(
+                                input_board.piece_at(index).symbol(), index, opposite_turn)
+
             if input_board.gives_check(move):
                 defender_count = -1
                 attacker_count = 0
@@ -200,9 +209,9 @@ def order_moves(input_board, moves):
                         if result:
                             piece = input_board.piece_at(index).symbol().lower()
                             if (piece == "k" or piece != "k") and defender_count > attacker_count:
-                                score_guess = round(10 * piece_val(move_piece.symbol(), destination, current_turn), 3)
+                                score_guess = 10 * piece_val(move_piece.symbol(), destination, current_turn)
                             if (piece == "k" or piece != "k") and defender_count < attacker_count:
-                                score_guess = round(piece_val(move_piece.symbol(), destination, current_turn), 3)
+                                score_guess = piece_val(move_piece.symbol(), destination, current_turn)
                             if score_guess in move_dict:
                                 move_dict[score_guess].append(move)
                             else:
@@ -219,33 +228,20 @@ def order_moves(input_board, moves):
 
                 if piece_val(capture_piece.symbol(), destination, opposite_turn) > piece_val(move_piece.symbol(),
                                                                                              destination, current_turn):
-                    score_guess = round(piece_val(capture_piece.symbol(), destination, opposite_turn) * abs(
-                        abs(defender_count) - abs(attacker_count)), 3)
-                if defender_count > attacker_count:
-                    score_guess += round(10 * piece_val(capture_piece.symbol(), destination, opposite_turn) - \
-                                         piece_val(move_piece.symbol(), destination, current_turn), 3)
+                    score_guess = piece_val(capture_piece.symbol(), destination, opposite_turn) * abs(
+                        abs(defender_count) - abs(attacker_count))
+                if defender_count >= attacker_count:
+                    score_guess += 10 * piece_val(capture_piece.symbol(), destination, opposite_turn) - \
+                                   piece_val(move_piece.symbol(), destination, current_turn)
                 if attacker_count > defender_count:
-                    score_guess -= round(10 * piece_val(capture_piece.symbol(), destination, opposite_turn) + \
-                                         piece_val(move_piece.symbol(), destination, current_turn), 3)
-                if attacker_count == defender_count:
-                    score_guess += round(10 * piece_val(capture_piece.symbol(), destination, opposite_turn) - \
-                                         piece_val(move_piece.symbol(), destination, current_turn), 3)
+                    score_guess -= 10 * piece_val(capture_piece.symbol(), destination, opposite_turn) + \
+                                   piece_val(move_piece.symbol(), destination, current_turn)
                 if score_guess in move_dict:
                     move_dict[score_guess].append(move)
                 else:
                     move_dict[score_guess] = [move]
-
-            if input_board.is_attacked_by(opposite_turn, destination):
-                attackers = input_board.attackers(opposite_turn, destination).tolist()
-                for index, result in enumerate(attackers):
-                    if result:
-                        piece = input_board.piece_at(index).symbol().lower()
-                        if piece == "p":
-                            score_guess -= round(piece_val(move_piece.symbol(), destination, current_turn) + piece_val(
-                                input_board.piece_at(index).symbol(), index, opposite_turn), 3)
-
             else:
-                score_guess += round(piece_val(move_piece.symbol(), destination, current_turn), 3)
+                score_guess += piece_val(move_piece.symbol(), destination, current_turn)
             if score_guess in move_dict:
                 move_dict[score_guess].append(move)
             else:
@@ -260,46 +256,48 @@ def order_moves(input_board, moves):
                 for index, result in enumerate(attackers):
                     if result:
                         piece = input_board.piece_at(index).symbol().lower()
-                        score_guess -= round(piece_val(move_piece.symbol(), destination, current_turn) +
-                                             piece_val(promotion, destination, current_turn) +
-                                             piece_val(piece, destination, opposite_turn), 3)
+                        score_guess -= piece_val(move_piece.symbol(), destination, current_turn) + \
+                                       piece_val(promotion, destination, current_turn) + \
+                                       piece_val(piece, destination, opposite_turn)
             if input_board.attackers(origin):
                 for square in input_board.attackers(origin):
                     piece = input_board.piece_at(square).symbol().lower()
-                    score_guess = round(piece_val(move_piece.symbol(), destination, current_turn) +
-                                        piece_val(promotion, destination, current_turn) +
-                                        piece_val(piece, destination, opposite_turn), 3)
+                    score_guess = piece_val(move_piece.symbol(), destination, current_turn) + \
+                                  piece_val(promotion, destination, current_turn) + \
+                                  piece_val(piece, destination, opposite_turn)
                     if score_guess in move_dict:
                         move_dict[score_guess].append(move)
                     else:
                         move_dict[score_guess] = [move]
             else:
-                score_guess = round(10 * piece_val(promotion, destination, current_turn), 3)
+                score_guess = 10 * piece_val(promotion, destination, current_turn)
             if score_guess in move_dict:
                 move_dict[score_guess].append(move)
             else:
                 move_dict[score_guess] = [move]
-
-    return move_dict
+    if not return_max:
+        return move_dict
+    if return_max:
+        move_order_keys = sorted(move_dict.keys(), reverse=True)[:branches]
+        moves_top_3 = []
+        for key in move_order_keys:
+            for move in move_dict[key]:
+                moves_top_3.append(move)
+        return moves_top_3
 
 
 def search(search_board, depth, alpha, beta):
     if depth == 0:
-        eval = evaluate(search_board)
-        return eval
+        final_evaluation = evaluate(search_board)
+        return final_evaluation
 
-    moves = order_moves(search_board, generate_moves(search_board))
+    moves = order_moves(search_board, generate_moves(search_board), True, 2)
     if len(moves) == 0:
         if search_board.is_checkmate():
             return -99999
         return 0
 
-    evals = moves.keys()
-    move_eval = max(evals)
-    moves_search = moves[move_eval]
-    random.shuffle(moves_search)
-
-    for move in moves_search:
+    for move in moves:
         search_board.push(move)
         evaluation = -1 * search(search_board, depth - 1, -beta, -alpha)
         search_board.pop()
@@ -332,20 +330,20 @@ def book_moves(opening_board):
 
 def make_move(board):
     if not board.is_game_over():
-        depth = 4
+        depth = 8
         if get_piece_count(board) <= 8:
-            depth = 6
+            depth = 10
         if get_piece_count(board) <= 4:
-            depth = 8
+            depth = 12
 
         turn = board.turn
         think_board = board.copy()
         think_board_two = board.copy()
 
         while book_moves(board) is not None:
-            ran = book_moves(board)
-            move = ran[1]
-            eval = ran[0]
+            book_move = book_moves(board)
+            move = book_move[1]
+            eval = book_move[0]
             board.push(move)
 
             if turn:
@@ -355,14 +353,10 @@ def make_move(board):
             return eval, move
 
         moves = generate_moves(board)
-        move_order = order_moves(think_board, moves)
+        move_order_list = order_moves(think_board, moves, True, 3)
 
-        evals = move_order.keys()
-        move_eval = max(evals)
-        moves_search = move_order[move_eval]
-        random.shuffle(moves_search)
         best_moves = {}
-        for move2 in moves_search:
+        for move2 in move_order_list:
             think_board_two.push(move2)
             move_eval = search(think_board_two, depth, -99999, 99999)
             if move_eval in best_moves:
@@ -371,8 +365,8 @@ def make_move(board):
                 best_moves[move_eval] = [move2]
             think_board_two.pop()
 
-        evals = best_moves.keys()
-        move_eval = max(evals)
+        evaluations = best_moves.keys()
+        move_eval = max(evaluations)
         best_moves_f = best_moves[move_eval]
         best_move = random.choice(best_moves_f)
 
@@ -466,8 +460,10 @@ def main():
     print(game_play[1])
     print("\n")
 
-    with open("game_save.txt", "w") as save_file:
+    with open("game_save.txt", "a") as save_file:
+        save_file.write("\n")
         save_file.write(str(game_play[0]))
+        save_file.write("\n")
     board.reset()
 
 

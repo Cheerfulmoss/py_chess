@@ -343,14 +343,14 @@ def make_move(board):
         while book_moves(board) is not None:
             book_move = book_moves(board)
             move = book_move[1]
-            eval = book_move[0]
+            evaluation = book_move[0]
             board.push(move)
 
             if turn:
-                print(f"White: {eval, move}")
+                print(f"White: {evaluation, move}")
             else:
-                print(f"Black: {eval, move}")
-            return eval, move
+                print(f"Black: {evaluation, move}")
+            return evaluation, move
 
         moves = generate_moves(board)
         move_order_list = order_moves(think_board, moves, True, 3)
@@ -381,7 +381,7 @@ def make_move(board):
         return move_eval, best_move
 
 
-def play_game(board):
+def play_game():
     board = chess.Board()
     force_game_over = False
     opening_book = select_book()
@@ -422,7 +422,7 @@ def play_game(board):
     if play == "both":
         game.setup(board)
         node = game
-        while not board.is_game_over() and force_game_over == False:
+        while not board.is_game_over() and not force_game_over:
             move = make_move(board)
             node = node.add_variation(move[1])
             node.comment = f"Move: {move[0]}"
@@ -435,7 +435,7 @@ def play_game(board):
         board.push(previous)
         game.setup(board)
         node = game
-        while not board.is_game_over() and force_game_over == False:
+        while not board.is_game_over() and not force_game_over:
             move = make_move(board)
             node = node.add_variation(move[1])
             node.comment = f"Move: {move[0]}"
@@ -454,7 +454,7 @@ def play_game(board):
 
 def main():
     board = chess.Board()
-    game_play = play_game(board)
+    game_play = play_game()
     print(f"Time: {game_play[3]}")
     print(game_play[0])
     print(game_play[1])

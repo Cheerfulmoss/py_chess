@@ -279,11 +279,11 @@ def order_moves(input_board, moves, return_max=False, branches=1):
         return move_dict
     if return_max:
         move_order_keys = sorted(move_dict.keys(), reverse=True)[:branches]
-        moves_top_3 = []
+        moves_top = []
         for key in move_order_keys:
             for move in move_dict[key]:
-                moves_top_3.append(move)
-        return moves_top_3
+                moves_top.append(move)
+        return moves_top
 
 
 def search(search_board, depth, alpha, beta):
